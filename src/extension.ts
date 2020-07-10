@@ -15,7 +15,6 @@ import {
 import { workspace, ExtensionContext } from 'vscode';
 import { VisualSetting } from './debug/visualSetting'
 let client: LanguageClient;
-let console = vscode.window.createOutputChannel("luapanda");
 
 function init_extension(context: ExtensionContext) {
     // reloadWindow
@@ -128,10 +127,12 @@ function open_languate_server(context: ExtensionContext) {
 }
 
 export function activate(context: ExtensionContext) {
-    init_extension(context);
-    let settings = VisualSetting.readLaunchjson();    
-    if (settings["openLanguageServer"]) {        
+    init_extension(context);        
+    if (false) {
         open_languate_server(context);
+        DebugLogger.DebuggerInfo("language server is enabled.");
+    } else {
+        DebugLogger.DebuggerInfo("language server is disabled.");
     }
 }
 
@@ -151,7 +152,7 @@ class LuaConfigurationProvider implements vscode.DebugConfigurationProvider {
     load_terminal(working_dir: string) {
         if (LuaConfigurationProvider.terminal) {
             LuaConfigurationProvider.terminal.dispose();
-        }        
+        }
         let term_cfg = { name: "Run Lua File (LuaPanda)", env: {} };
         if (working_dir) {
             term_cfg["cwd"] = working_dir;
@@ -195,8 +196,7 @@ class LuaConfigurationProvider implements vscode.DebugConfigurationProvider {
         if (!command) {
             return;
         }
-        let cwd = config["command_working_dir"];
-        console.append("root path:" + cwd);
+        let cwd = config["command_working_dir"];        
         this.load_terminal(cwd);
         LuaConfigurationProvider.terminal.sendText(command, true);
         LuaConfigurationProvider.terminal.show();
