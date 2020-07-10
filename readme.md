@@ -1,11 +1,12 @@
 # LuaPanda
-## 此版本主要与官方的主要区别：
+### 此版本主要与官方的主要区别：
 - 关闭LanguageServer：将LuaPanda作为一个调试器使用，LanguageServer使用EmmyLua的。
 - 调试时增加自动启动程序功能：在配置文件中配置
   - "command": 程序的命令行。
   - "command_working_dir": 工作目录（注意该目录不一定是代码目录）。
-===============================================================================================
-LuaPanda 是一个基于 VS Code 的 lua 代码工具，设计目标是简单易用。它支持多种开发框架，主要提供以下功能：
+
+
+## LuaPanda 是一个基于 VS Code 的 lua 代码工具，设计目标是简单易用。它支持多种开发框架，主要提供以下功能：
 
 - 自动补全（auto completion）
 - 代码片段（snippet completion）
