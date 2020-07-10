@@ -7,16 +7,17 @@ import { DebugLogger } from './common/logManager';
 import { StatusBarManager } from './common/statusBarManager';
 import { Tools } from './common/tools';
 import {
-	LanguageClient,
-	LanguageClientOptions,
-	ServerOptions,
-	TransportKind
+    LanguageClient,
+    LanguageClientOptions,
+    ServerOptions,
+    TransportKind
 } from 'vscode-languageclient';
 import { workspace, ExtensionContext } from 'vscode';
 import { VisualSetting } from './debug/visualSetting'
 let client: LanguageClient;
+let console = vscode.window.createOutputChannel("luapanda");
 
-export function activate(context: ExtensionContext) {
+function init_extension(context: ExtensionContext) {
     // reloadWindow
     let reloadWindow = vscode.commands.registerCommand('luapanda.reloadLuaDebug', function () {
         vscode.commands.executeCommand("workbench.action.reloadWindow")
@@ -31,7 +32,7 @@ export function activate(context: ExtensionContext) {
 
     let openSettingsPage = vscode.commands.registerCommand('luapanda.openSettingsPage', function () {
         //先尝试获取数据，如果数据获取失败，给错误提示。
-        try{
+        try {
             let launchData = VisualSetting.getLaunchData();
             // 和VSCode的交互
             let panel: vscode.WebviewPanel = vscode.window.createWebviewPanel(
@@ -43,7 +44,7 @@ export function activate(context: ExtensionContext) {
                     enableScripts: true
                 }
             );
-            
+
             panel.webview.html = Tools.readFileContent(Tools.VSCodeExtensionPath + '/res/web/settings.html');
             // Handle messages from the webview
             panel.webview.onDidReceiveMessage(message => {
@@ -54,10 +55,10 @@ export function activate(context: ExtensionContext) {
             );
 
             panel.webview.postMessage(launchData);
-        }catch (error) {
-            DebugLogger.showTips("解析 launch.json 文件失败, 请检查此文件配置项是否异常, 或手动修改 launch.json 中的项目来完成配置!", 2);   
+        } catch (error) {
+            DebugLogger.showTips("解析 launch.json 文件失败, 请检查此文件配置项是否异常, 或手动修改 launch.json 中的项目来完成配置!", 2);
         }
-    
+
     });
     context.subscriptions.push(openSettingsPage);
 
@@ -66,54 +67,56 @@ export function activate(context: ExtensionContext) {
     context.subscriptions.push(provider);
 
     // 公共变量赋值
-    let pkg = require( context.extensionPath + "/package.json");
+    let pkg = require(context.extensionPath + "/package.json");
     Tools.adapterVersion = pkg.version;
     Tools.VSCodeExtensionPath = context.extensionPath;
     // init log
     DebugLogger.init();
     StatusBarManager.init();
+}
 
+function open_languate_server(context: ExtensionContext) {
     // language server 相关
-	// The server is implemented in node
-	let serverModule = context.asAbsolutePath(
-		path.join('out', 'code', 'server', 'server.js')
-	);
-	// The debug options for the server
-	// --inspect=6009: runs the server in Node's Inspector mode so VS Code can attach to the server for debugging
-	let debugOptions = { execArgv: ['--nolazy', '--inspect=6009'] };
+    // The server is implemented in node
+    let serverModule = context.asAbsolutePath(
+        path.join('out', 'code', 'server', 'server.js')
+    );
+    // The debug options for the server
+    // --inspect=6009: runs the server in Node's Inspector mode so VS Code can attach to the server for debugging
+    let debugOptions = { execArgv: ['--nolazy', '--inspect=6009'] };
 
-	// If the extension is launched in debug mode then the debug server options are used
-	// Otherwise the run options are used
-	let serverOptions: ServerOptions = {
-		run: { module: serverModule, transport: TransportKind.ipc },
-		debug: {
-			module: serverModule,
-			transport: TransportKind.ipc,
-			options: debugOptions
-		}
-	};
+    // If the extension is launched in debug mode then the debug server options are used
+    // Otherwise the run options are used
+    let serverOptions: ServerOptions = {
+        run: { module: serverModule, transport: TransportKind.ipc },
+        debug: {
+            module: serverModule,
+            transport: TransportKind.ipc,
+            options: debugOptions
+        }
+    };
 
-	// Options to control the language client
-	let clientOptions: LanguageClientOptions = {
-		// Register the server for plain text documents
-		documentSelector: [{ scheme: 'file', language: 'lua' }],
-		synchronize: {
-			// Notify the server about file changes to '.clientrc files contained in the workspace
-			fileEvents: workspace.createFileSystemWatcher('**/.clientrc')
-		}
-	};
+    // Options to control the language client
+    let clientOptions: LanguageClientOptions = {
+        // Register the server for plain text documents
+        documentSelector: [{ scheme: 'file', language: 'lua' }],
+        synchronize: {
+            // Notify the server about file changes to '.clientrc files contained in the workspace
+            fileEvents: workspace.createFileSystemWatcher('**/.clientrc')
+        }
+    };
 
-	// Create the language client and start the client.
-	client = new LanguageClient(
-		'lua_analyzer',
-		'Lua Analyzer',
-		serverOptions,
-		clientOptions
-	);
+    // Create the language client and start the client.
+    client = new LanguageClient(
+        'lua_analyzer',
+        'Lua Analyzer',
+        serverOptions,
+        clientOptions
+    );
 
-	// Start the client. This will also launch the server
-	client.start();
-	client.onReady().then(() => {
+    // Start the client. This will also launch the server
+    client.start();
+    client.onReady().then(() => {
         Tools.client = client;
         client.onNotification("showProgress", showProgress);
         client.onNotification("setRootFolder", setRootFolder);
@@ -121,23 +124,89 @@ export function activate(context: ExtensionContext) {
         client.onNotification("showErrorMessage", showErrorMessage);
         client.onNotification("showWarningMessage", showWarningMessage);
         client.onNotification("showInformationMessage", showInformationMessage);
-	});
+    });
+}
 
+export function activate(context: ExtensionContext) {
+    init_extension(context);
+    let settings = VisualSetting.readLaunchjson();    
+    if (settings["openLanguageServer"]) {        
+        open_languate_server(context);
+    }
 }
 
 export function deactivate() {
     if (!client) {
-		return undefined;
+        return undefined;
     }
     Tools.client = undefined;
-	return client.stop();
+    return client.stop();
 }
 
 // debug启动时的配置项处理
 class LuaConfigurationProvider implements vscode.DebugConfigurationProvider {
     private _server?: Net.Server;
-    private static RunFileTerminal;
-    resolveDebugConfiguration(folder: vscode.WorkspaceFolder | undefined, config: vscode.DebugConfiguration, token?: vscode.CancellationToken): vscode.ProviderResult<vscode.DebugConfiguration> {
+    private static terminal;
+
+    load_terminal(working_dir: string) {
+        if (LuaConfigurationProvider.terminal) {
+            LuaConfigurationProvider.terminal.dispose();
+        }        
+        let term_cfg = { name: "Run Lua File (LuaPanda)", env: {} };
+        if (working_dir) {
+            term_cfg["cwd"] = working_dir;
+        }
+        LuaConfigurationProvider.terminal = vscode.window.createTerminal(term_cfg);
+    }
+
+    run_lua_with_file(config: vscode.DebugConfiguration) {
+        // 获取活跃窗口
+        let active_file = Tools.getVSCodeAvtiveFilePath();
+        if (active_file["retCode"] !== 0) {
+            DebugLogger.DebuggerInfo(active_file["retMsg"]);
+            return;
+        }
+        this.load_terminal(null);
+        let filePath = active_file["filePath"];
+        // 把路径加入package.path
+        let path = require("path");
+        let pathCMD = "'";
+        let pathArr = Tools.VSCodeExtensionPath.split(path.sep);
+        let stdPath = pathArr.join('/');
+        pathCMD = pathCMD + stdPath + "/Debugger/?.lua;"
+        pathCMD = pathCMD + config.packagePath.join(';')
+        pathCMD = pathCMD + "'";
+        pathCMD = " \"package.path = " + pathCMD + ".. package.path;\" ";
+        let doFileCMD = filePath;
+        let runCMD = pathCMD + doFileCMD;
+        let LuaCMD;
+        if (config.luaPath && config.luaPath !== '') {
+            LuaCMD = config.luaPath + " -e "
+        } else {
+            LuaCMD = "lua -e ";
+        }
+        LuaConfigurationProvider.terminal.sendText(LuaCMD + runCMD, true);
+        LuaConfigurationProvider.terminal.show();
+        return;
+    }
+
+    run_custom_process(config: vscode.DebugConfiguration) {
+        let command = config["command"];
+        if (!command) {
+            return;
+        }
+        let cwd = config["command_working_dir"];
+        console.append("root path:" + cwd);
+        this.load_terminal(cwd);
+        LuaConfigurationProvider.terminal.sendText(command, true);
+        LuaConfigurationProvider.terminal.show();
+        return;
+    }
+
+    resolveDebugConfiguration(
+        folder: vscode.WorkspaceFolder | undefined,
+        config: vscode.DebugConfiguration,
+        token?: vscode.CancellationToken): vscode.ProviderResult<vscode.DebugConfiguration> {
         // if launch.json is missing or empty
         if (!config.type && !config.name) {
             const editor = vscode.window.activeTextEditor;
@@ -150,69 +219,35 @@ class LuaConfigurationProvider implements vscode.DebugConfigurationProvider {
         }
 
         // 不调试而直接运行当前文件
-        if(config.noDebug){
-            // 获取活跃窗口
-            let retObject = Tools.getVSCodeAvtiveFilePath();
-            if( retObject["retCode"] !== 0 ){
-                DebugLogger.DebuggerInfo(retObject["retMsg"]);
-                return;
-            }
-            let filePath = retObject["filePath"];
-
-            if(LuaConfigurationProvider.RunFileTerminal){
-                LuaConfigurationProvider.RunFileTerminal.dispose();
-            }
-            LuaConfigurationProvider.RunFileTerminal = vscode.window.createTerminal({
-                name: "Run Lua File (LuaPanda)",
-                env: {}, 
-            });
-
-            // 把路径加入package.path
-            let path = require("path");
-            let pathCMD = "'";
-            let pathArr = Tools.VSCodeExtensionPath.split( path.sep );
-            let stdPath = pathArr.join('/');
-            pathCMD = pathCMD + stdPath + "/Debugger/?.lua;"
-            pathCMD = pathCMD + config.packagePath.join(';')
-            pathCMD = pathCMD + "'";
-            //拼接命令
-            pathCMD = " \"package.path = " + pathCMD + ".. package.path;\" ";
-            let doFileCMD =  filePath;
-            let runCMD = pathCMD + doFileCMD;
-
-            let LuaCMD;
-            if(config.luaPath && config.luaPath !== ''){
-                LuaCMD = config.luaPath + " -e "
-            }else{
-                LuaCMD = "lua -e ";
-            }
-            LuaConfigurationProvider.RunFileTerminal.sendText( LuaCMD + runCMD , true);
-            LuaConfigurationProvider.RunFileTerminal.show();
-            return ;
+        if (config.noDebug) {
+            this.run_lua_with_file(config);
+            return;
+        } else {
+            this.run_custom_process(config);
         }
 
         // 关于打开调试控制台的自动设置
-        if(config.name === "LuaPanda-DebugFile"){
-            if(!config.internalConsoleOptions){
+        if (config.name === "LuaPanda-DebugFile") {
+            if (!config.internalConsoleOptions) {
                 config.internalConsoleOptions = "neverOpen";
             }
-        }else{
-            if(!config.internalConsoleOptions){
+        } else {
+            if (!config.internalConsoleOptions) {
                 config.internalConsoleOptions = "openOnFirstSessionStart";
             }
-            
-            if(config.name === "LuaPanda-Attach"){
-                if(!Tools.VSCodeOpenedFolder){
+
+            if (config.name === "LuaPanda-Attach") {
+                if (!Tools.VSCodeOpenedFolder) {
                     // 如果插件还未启动，在这里等待一下
                     vscode.window.showWarningMessage('LuaPanda 插件正在启动， 请再次点击 Run 按钮进行 attach 调试！', "好的");
                     return;
-                }else{
+                } else {
                     // 读取LuaPanda的配置项，判断attach中是否有，如果有的话不再覆盖，没有的话覆盖
                     let settings = VisualSetting.readLaunchjson();
                     for (const launchValue of settings.configurations) {
-                        if(launchValue["name"] === "LuaPanda"){
+                        if (launchValue["name"] === "LuaPanda") {
                             for (const key in launchValue) {
-                                if(key === "name" || key === "program" || config[key]){
+                                if (key === "name" || key === "program" || config[key]) {
                                     continue;
                                 }
                                 config[key] = launchValue[key];
@@ -223,15 +258,15 @@ class LuaConfigurationProvider implements vscode.DebugConfigurationProvider {
             }
         }
 
-        if(!config.program){
+        if (!config.program) {
             config.program = '';
         }
 
-        if(!config.autoPathMode){
+        if (!config.autoPathMode) {
             config.autoPathMode = false;
         }
 
-        if(!config.args){
+        if (!config.args) {
             config.args = new Array<string>();
         }
 
@@ -249,10 +284,10 @@ class LuaConfigurationProvider implements vscode.DebugConfigurationProvider {
 
         if (!config.luaFileExtension) {
             config.luaFileExtension = '';
-        }else{
+        } else {
             let firseLetter = config.luaFileExtension.substr(0, 1);
-            if(firseLetter === '.'){
-                config.luaFileExtension =  config.luaFileExtension.substr(1);
+            if (firseLetter === '.') {
+                config.luaFileExtension = config.luaFileExtension.substr(1);
             }
         }
 
@@ -298,7 +333,7 @@ class LuaConfigurationProvider implements vscode.DebugConfigurationProvider {
         if (config.isNeedB64EncodeStr == undefined) {
             config.isNeedB64EncodeStr = true;
         }
-        
+
         if (!this._server) {
             this._server = Net.createServer(socket => {
                 const session = new LuaDebugSession();

@@ -13,6 +13,6 @@
 		"preserveConstEnums": true,
 		"strictNullChecks": false,
 		"noUnusedParameters": false,
-		"strict": false   /* enable all strict type-checking options */
+		"strict": false
 	}
 }
